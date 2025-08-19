@@ -40,7 +40,17 @@ export async function updateEventLayout(eventId: string, tables: Table[]): Promi
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tables }),
   });
-  if (!res.ok) throw new Error('Failed to update layout');
+  if (!res.ok) {
+    let msg = 'Failed to update layout';
+    try {
+      const data = await res.json();
+      if (data?.message) msg = data.message;
+      if (data?.error) msg = data.error;
+    } catch (_) {
+      // ignore
+    }
+    throw new Error(msg);
+  }
 }
 
 export async function addGuest(eventId: string, guest: Partial<Guest>): Promise<void> {

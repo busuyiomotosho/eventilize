@@ -122,6 +122,15 @@ body {
   background-size: 20px 20px;
 }
 
+/* Improve text rendering for exported layout images */
+.hall-canvas, .hall-canvas * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  image-rendering: optimizeQuality;
+}
+
 .table-element {
   border: 2px solid #3B82F6;
   border-radius: 8px;

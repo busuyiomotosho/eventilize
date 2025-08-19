@@ -41,8 +41,12 @@ export async function POST(request: NextRequest) {
     qrCode,
   });
   await event.save();
+  // Convert to plain object and add `id` for frontend compatibility
+  const eventObj: any = event.toObject ? event.toObject() : { ...event };
+  eventObj.id = eventObj.id || eventObj._id?.toString() || '';
+
   return NextResponse.json(
-    { message: 'Event created successfully', event },
+    { message: 'Event created successfully', event: eventObj },
     { status: 201 }
   );
 }

@@ -96,10 +96,11 @@ function TableModal({ open, table, guests, onRename, onClose, renaming, setRenam
       <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md mx-4 relative" onClick={e => e.stopPropagation()}>
         <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" onClick={onClose}>&times;</button>
         <div className="flex items-center gap-2 mb-4">
-          {renaming === table.id ? (
+            {renaming === table.id ? (
             <form onSubmit={e => { e.preventDefault(); onRename(table.id, renameValue); }} className="flex items-center gap-1">
-              <input className="border rounded px-1 py-0.5 text-lg font-bold w-32" value={renameValue} onChange={e => setRenameValue(e.target.value)} autoFocus onBlur={() => setRenaming(null)} />
+              <input className="border rounded px-1 py-0.5 text-lg font-bold w-32" value={renameValue} onChange={e => setRenameValue(e.target.value)} autoFocus />
               <button type="submit" className="text-blue-600 text-xs px-1">✔</button>
+              <button type="button" className="text-gray-500 text-xs px-1" onClick={() => setRenaming(null)}>Cancel</button>
             </form>
           ) : (
             <>

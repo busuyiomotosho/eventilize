@@ -15,7 +15,9 @@ export async function GET(_req: NextRequest, context) {
   if (!id) return errorResponse('Missing event id', 400);
   const event = await Event.findById(id).lean() as IEvent | null;
   if (!event) return errorResponse('Event not found', 404);
-  return NextResponse.json({ event });
+  const eventObj: any = { ...event };
+  eventObj.id = eventObj.id || eventObj._id?.toString() || '';
+  return NextResponse.json({ event: eventObj });
 }
 
 // PUT: Update event
@@ -33,7 +35,9 @@ export async function PUT(req: NextRequest, context) {
   }
   const event = await Event.findByIdAndUpdate(id, body, { new: true }).lean() as IEvent | null;
   if (!event) return errorResponse('Event not found', 404);
-  return NextResponse.json({ event });
+  const eventObj: any = { ...event };
+  eventObj.id = eventObj.id || eventObj._id?.toString() || '';
+  return NextResponse.json({ event: eventObj });
 }
 
 // DELETE: Delete event

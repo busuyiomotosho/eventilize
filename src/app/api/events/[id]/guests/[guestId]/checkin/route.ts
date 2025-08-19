@@ -10,7 +10,8 @@ function errorResponse(message: string, status: number = 400) {
 // PATCH: Toggle guest check-in
 // @ts-expect-error Next.js 15 context typing
 export async function PATCH(req: NextRequest, context) {
-  const { id, guestId } = context.params;
+  const params = await context.params;
+  const { id, guestId } = params;
   await dbConnect();
   if (!id || !guestId) return errorResponse('Missing event or guest id', 400);
   let checkedIn: boolean;

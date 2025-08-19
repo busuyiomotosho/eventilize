@@ -12,7 +12,8 @@ function errorResponse(message: string, status: number = 400) {
 // PATCH: Toggle guest check-in
 // @ts-expect-error Next.js 15 context typing
 export async function PATCH(req: NextRequest, context) {
-  const { id, guestId } = context.params;
+  const params = await context.params;
+  const { id, guestId } = params;
   await dbConnect();
   if (!id || !guestId) return errorResponse('Missing event or guest id', 400);
   let checkedIn: boolean;
@@ -36,7 +37,8 @@ export async function PATCH(req: NextRequest, context) {
 // PUT: Edit guest
 // @ts-expect-error Next.js 15 context typing
 export async function PUT(req: NextRequest, context) {
-  const { id, guestId } = context.params;
+  const params = await context.params;
+  const { id, guestId } = params;
   await dbConnect();
   if (!id || !guestId) return errorResponse('Missing event or guest id', 400);
   let name: string, email: string, assignedTable: string;
@@ -82,7 +84,8 @@ export async function PUT(req: NextRequest, context) {
 // DELETE: Remove guest
 // @ts-expect-error Next.js 15 context typing
 export async function DELETE(_req: NextRequest, context) {
-  const { id, guestId } = context.params;
+  const params = await context.params;
+  const { id, guestId } = params;
   await dbConnect();
   if (!id || !guestId) return errorResponse('Missing event or guest id', 400);
   const event = await Event.findById(id);

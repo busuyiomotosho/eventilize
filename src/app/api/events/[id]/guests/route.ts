@@ -14,7 +14,8 @@ function errorResponse(message: string, status: number = 400) {
 // @ts-expect-error Next.js 15 context typing
 export async function POST(req: NextRequest, context) {
   await dbConnect();
-  const { id } = context.params;
+  const params = await context.params;
+  const { id } = params;
   if (!id) return errorResponse('Missing event id', 400);
   let name: string, email: string, assignedTable: string;
   try {

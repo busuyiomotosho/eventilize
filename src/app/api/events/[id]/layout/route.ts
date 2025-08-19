@@ -13,7 +13,8 @@ function errorResponse(message: string, status: number = 400) {
 // @ts-expect-error Next.js 15 context typing
 export async function GET(_req: NextRequest, context) {
   await dbConnect();
-  const { id } = context.params;
+  const params = await context.params;
+  const { id } = params;
   if (!id) return errorResponse('Missing event id', 400);
   const event = await Event.findById(id).lean() as import('@/lib/models/Event').IEvent | null;
   if (!event) return errorResponse('Event not found', 404);
@@ -25,7 +26,8 @@ export async function GET(_req: NextRequest, context) {
 // @ts-expect-error Next.js 15 context typing
 export async function PUT(req: NextRequest, context) {
   await dbConnect();
-  const { id } = context.params;
+  const params = await context.params;
+  const { id } = params;
   if (!id) return errorResponse('Missing event id', 400);
   let tables: ITable[];
   try {
@@ -35,9 +37,12 @@ export async function PUT(req: NextRequest, context) {
   } catch {
     return errorResponse('Invalid JSON body', 400);
   }
-  const event = await Event.findById(id);
-  if (!event) return errorResponse('Event not found', 404);
-  event.tables = tables;
-  await event.save();
-  return NextResponse.json({ tables: event.tables });
+  // Use an atomic update to avoid optimistic concurrency/versioning issues
+  const updated = await Event.findByIdAndUpdate(
+    id,
+    { $set: { tables } },
+    { new: true }
+  ).lean() as import('@/lib/models/Event').IEvent | null;
+  if (!updated) return errorResponse('Event not found', 404);
+  return NextResponse.json({ tables: updated.tables || [] });
 }
