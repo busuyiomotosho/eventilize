@@ -17,6 +17,7 @@ type Table = {
 
 import { fetchEventById, updateEvent, updateEventLayout, addGuest, updateGuest, deleteGuest, toggleGuestCheckin } from '@/lib/api';
 import type { Event, Guest } from '../../lib/types';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 // Make sure NOT to import Table from '../../lib/types' or '@/components/events/HallLayoutPlanner' anywhere in this file
 
 // Dynamically import HallLayoutPlanner to avoid SSR issues
@@ -167,7 +168,7 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const guestsPerPage = 5;
+  const [guestsPerPage, setGuestsPerPage] = useState(5);
 
   // Debounce search input
   useEffect(() => {
@@ -319,91 +320,94 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
                 }}
               >Download Sample CSV</button>
             </div>
-            <input
-              type="file"
-              accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                setAdding(true);
-                setError(null);
-                let rows: any[] = [];
-                try {
-                  if (file.name.endsWith('.csv')) {
-                    const text = await file.text();
-                    const parsed = Papa.parse(text, { header: true });
-                    rows = parsed.data;
-                  } else {
-                    const data = await file.arrayBuffer();
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    rows = XLSX.utils.sheet_to_json(sheet);
-                  }
-                  // Find all unique table names in the file
-                  const tableNamesInFile = Array.from(new Set(rows.map(row => (row['Table name'] || row['Table Name'] || row.table || row.tableName || row.Table || '').trim()).filter(Boolean)));
-                  // Find missing tables
-                  const existingTableNames = (event.tables || []).map((t: any) => t.name.trim().toLowerCase());
-                  const missingTableNames = tableNamesInFile.filter(name => !existingTableNames.includes(name.trim().toLowerCase()));
-                  // Add missing tables as round tables with 10 capacity
-                  let updatedTables = [...(event.tables || [])];
-                  let tablesAdded = 0;
-                  for (const tableName of missingTableNames) {
-                    const newTable = {
-                      id: `table_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                      name: tableName,
-                      shape: 'round',
-                      capacity: 10,
-                      x: 50 + (updatedTables.length * 80) % 500,
-                      y: 50 + Math.floor(updatedTables.length / 6) * 80,
-                      assignedGuests: [],
-                      rotation: 0,
-                    };
-                    updatedTables.push(newTable);
-                    tablesAdded++;
-                  }
-                  // If new tables were added, update event in backend
-                  if (tablesAdded > 0) {
-                    await updateEventLayout(eventId, updatedTables);
-                  }
-                  // Refresh event to get new tables
-                  let refreshedEvent = event;
-                  if (tablesAdded > 0) {
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-sm font-medium">Import Guests</label>
+              <input
+                type="file"
+                accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setAdding(true);
+                  setError(null);
+                  let rows: any[] = [];
+                  try {
+                    if (file.name.endsWith('.csv')) {
+                      const text = await file.text();
+                      const parsed = Papa.parse(text, { header: true });
+                      rows = parsed.data;
+                    } else {
+                      const data = await file.arrayBuffer();
+                      const workbook = XLSX.read(data, { type: 'array' });
+                      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                      rows = XLSX.utils.sheet_to_json(sheet);
+                    }
+                    // Find all unique table names in the file
+                    const tableNamesInFile = Array.from(new Set(rows.map(row => (row['Table name'] || row['Table Name'] || row.table || row.tableName || row.Table || '').trim()).filter(Boolean)));
+                    // Find missing tables
+                    const existingTableNames = (event.tables || []).map((t: any) => t.name.trim().toLowerCase());
+                    const missingTableNames = tableNamesInFile.filter(name => !existingTableNames.includes(name.trim().toLowerCase()));
+                    // Add missing tables as round tables with 10 capacity
+                    let updatedTables = [...(event.tables || [])];
+                    let tablesAdded = 0;
+                    for (const tableName of missingTableNames) {
+                      const newTable = {
+                        id: `table_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                        name: tableName,
+                        shape: 'round',
+                        capacity: 10,
+                        x: 50 + (updatedTables.length * 80) % 500,
+                        y: 50 + Math.floor(updatedTables.length / 6) * 80,
+                        assignedGuests: [],
+                        rotation: 0,
+                      };
+                      updatedTables.push(newTable);
+                      tablesAdded++;
+                    }
+                    // If new tables were added, update event in backend
+                    if (tablesAdded > 0) {
+                      await updateEventLayout(eventId, updatedTables);
+                    }
+                    // Refresh event to get new tables
+                    let refreshedEvent = event;
+                    if (tablesAdded > 0) {
+                      const data = await fetchEventById(eventId);
+                      refreshedEvent = data.event || event;
+                      setEvent(refreshedEvent);
+                    }
+                    // Import each guest
+                    let success = 0, failed = 0;
+                    for (const row of rows) {
+                      const name = row.Name || row.name;
+                      const email = row.Email || row.email;
+                      const tableName = row['Table name'] || row['Table Name'] || row.table || row.tableName || row.Table;
+                      if (!name) { failed++; continue; }
+                      let assignedTable = '';
+                      if (tableName && refreshedEvent.tables) {
+                        const match = refreshedEvent.tables.find((t: any) => t.name.trim().toLowerCase() === String(tableName).trim().toLowerCase());
+                        if (match) assignedTable = match.id;
+                      }
+                      try {
+                        await addGuest(eventId, { name, email, assignedTable });
+                        success++;
+                      } catch {
+                        failed++;
+                      }
+                    }
+                    // Refresh event guest list
                     const data = await fetchEventById(eventId);
-                    refreshedEvent = data.event || event;
-                    setEvent(refreshedEvent);
+                    setEvent(data.event || null);
+                    alert(`Imported: ${success} guests. Failed: ${failed}. Tables added: ${tablesAdded}`);
+                  } catch (err: any) {
+                    setError('Import failed: ' + (err.message || 'Unknown error'));
                   }
-                  // Import each guest
-                  let success = 0, failed = 0;
-                  for (const row of rows) {
-                    const name = row.Name || row.name;
-                    const email = row.Email || row.email;
-                    const tableName = row['Table name'] || row['Table Name'] || row.table || row.tableName || row.Table;
-                    if (!name) { failed++; continue; }
-                    let assignedTable = '';
-                    if (tableName && refreshedEvent.tables) {
-                      const match = refreshedEvent.tables.find((t: any) => t.name.trim().toLowerCase() === String(tableName).trim().toLowerCase());
-                      if (match) assignedTable = match.id;
-                    }
-                    try {
-                      await addGuest(eventId, { name, email, assignedTable });
-                      success++;
-                    } catch {
-                      failed++;
-                    }
-                  }
-                  // Refresh event guest list
-                  const data = await fetchEventById(eventId);
-                  setEvent(data.event || null);
-                  alert(`Imported: ${success} guests. Failed: ${failed}. Tables added: ${tablesAdded}`);
-                } catch (err: any) {
-                  setError('Import failed: ' + (err.message || 'Unknown error'));
-                }
-                setAdding(false);
-                e.target.value = '';
-              }}
-              className="border rounded px-3 py-2 w-full mb-2"
-              disabled={adding}
-            />
+                  setAdding(false);
+                  e.target.value = '';
+                }}
+                className="border rounded p-1 w-1/4 mb-2"
+                disabled={adding}
+              />
+            </div>
             <div className="text-xs text-gray-500">Accepted: CSV, XLSX, XLS. Columns: Name, Email, Table name</div>
           </div>
           {/* Add Guest Form */}
@@ -466,7 +470,7 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
             </button>
           </form>
           {error && <div className="text-red-600 mb-2">{error}</div>}
-          {/* Search and Pagination Controls */}
+          {/* Search, Filter, and Pagination Controls */}
           <div className="flex flex-col md:flex-row md:items-center gap-2 mb-4">
             <input
               type="text"
@@ -545,18 +549,40 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
                     })}
                   </ul>
                   {/* Pagination Controls */}
-                  <div className="flex justify-center items-center gap-2 mt-4">
-                    <button
-                      className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                      disabled={currentPage === 1}
-                    >Previous</button>
-                    <span className="text-sm">Page {currentPage} of {totalPages}</span>
-                    <button
-                      className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
-                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                      disabled={currentPage === totalPages}
-                    >Next</button>
+                  <div className="flex justify-between items-center gap-2 mt-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft />
+                      </button>
+                      <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                      <button
+                        className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight />
+                      </button>
+                    </div>
+                    <label className="block text-sm font-medium ml-2">Show
+                      <select
+                        className="ml-2 border rounded px-2 py-1"
+                        value={guestsPerPage}
+                        onChange={e => {
+                          setGuestsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                      </select>
+                      guests
+                    </label>
+
                   </div>
                   {/* Edit Guest Modal */}
                   <GuestEditModal

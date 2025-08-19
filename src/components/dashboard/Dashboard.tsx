@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import LogoutButton from '@/components/auth/LogoutButton';
 import { fetchAllEvents, createEvent } from '@/lib/api';
 import type { Event } from '@/lib/types';
 
@@ -117,9 +118,12 @@ export default function Dashboard({ onSelectEvent }: { onSelectEvent: (id: strin
 
   return (
     <div className="container mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h2 className="text-3xl font-bold text-gray-800 mb-2">Dashboard</h2>
-        <p className="text-gray-600">Manage your events and track attendance</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Dashboard</h2>
+          <p className="text-gray-600">Manage your events and track attendance</p>
+        </div>
+        <LogoutButton />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="stat-card text-white p-6 rounded-lg">
