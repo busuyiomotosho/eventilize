@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Guest Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        .drag-item {
+            cursor: grab;
+        }
+        .drag-item:active {
+            cursor: grabbing;
+        }
+        .hall-canvas {
+            background-image: 
+                linear-gradient(rgba(0,0,0,.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .table-element {
+            border: 2px solid #3B82F6;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(45deg, #3B82F6, #1D4ED8);
+            cursor: move;
+            user-select: none;
+        }
+        .table-full { background: linear-gradient(45deg, #EF4444, #DC2626) !important; }
+        .table-partial { background: linear-gradient(45deg, #F59E0B, #D97706) !important; }
+        .guest-item {
+            transition: all 0.3s ease;
+        }
+        .guest-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .scanner-container {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        #qr-reader {
+            width: 100%;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-blue-600 text-white shadow-lg" id="navigation" style="display: none;">
+        <div class="container mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <i class="fas fa-calendar-alt text-2xl mr-3"></i>
+                    <h1 class="text-xl font-bold">Event Manager</h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="userEmail" class="hidden md:block"></span>
+                    <button onclick="logout()" class="bg-red-500 hover:bg-red-600 px-3 py-1 rounded">
+                        <i class="fas fa-sign-out-alt mr-1"></i>Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Authentication Section -->
+    <div id="authSection" class="min-h-screen flex items-center justify-center">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="text-center mb-8">
+                <i class="fas fa-calendar-alt text-4xl text-blue-600 mb-4"></i>
+                <h2 class="text-2xl font-bold text-gray-800">Event Guest Manager</h2>
+                <p class="text-gray-600 mt-2">Streamline your event guest management</p>
+            </div>
+            
+            <div class="mb-6">
+                <div class="flex bg-gray-200 rounded-lg p-1">
+                    <button id="loginTab" onclick="switchAuthTab('login')" class="flex-1 py-2 text-center rounded-lg bg-blue-600 text-white">Login</button>
+                    <button id="registerTab" onclick="switchAuthTab('register')" class="flex-1 py-2 text-center rounded-lg text-gray-600">Register</button>
+                </div>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                    <input type="password" id="loginPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center">
+                    <span id="loginBtnText">Login</span>
+                    <div id="loginSpinner" class="loading-spinner ml-2" style="display: none;"></div>
+                </button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="registerForm" onsubmit="handleRegister(event)" style="display: none;">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Full Name</label>
+                    <input type="text" id="registerName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                    <input type="email" id="registerEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Password</label>
+                    <input type="password" id="registerPassword" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 flex items-center justify-center">
+                    <span id="registerBtnText">Create Account</span>
+                    <div id="registerSpinner" class="loading-spinner ml-2" style="display: none;"></div>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <p class="text-gray-600 text-sm">Demo account: demo@example.com / password123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" style="display: none;">
+        <!-- Dashboard -->
+        <div id="dashboardSection" class="container mx-auto px-4 py-6">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold text-gray-800 mb-2">Dashboard</h2>
+                <p class="text-gray-600">Manage your events and track attendance</p>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="stat-card text-white p-6 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-calendar text-2xl mr-4"></i>
+                        <div>
+                            <p class="text-sm opacity-80">Total Events</p>
+                            <p class="text-2xl font-bold" id="totalEvents">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-green-500 text-white p-6 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-users text-2xl mr-4"></i>
+                        <div>
+                            <p class="text-sm opacity-80">Total Guests</p>
+                            <p class="text-2xl font-bold" id="totalGuests">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-yellow-500 text-white p-6 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-check-circle text-2xl mr-4"></i>
+                        <div>
+                            <p class="text-sm opacity-80">Checked In</p>
+                            <p class="text-2xl font-bold" id="checkedInGuests">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-red-500 text-white p-6 rounded-lg">
+                    <div class="flex items-center">
+                        <i class="fas fa-clock text-2xl mr-4"></i>
+                        <div>
+                            <p class="text-sm opacity-80">Pending</p>
+                            <p class="text-2xl font-bold" id="pendingGuests">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-4 mb-8">
+                <button onclick="showCreateEvent()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center">
+                    <i class="fas fa-plus mr-2"></i>Create New Event
+                </button>
+                <button onclick="showEventList()" class="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 flex items-center">
+                    <i class="fas fa-list mr-2"></i>View All Events
+                </button>
+            </div>
+
+            <!-- Recent Events -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-4">Recent Events</h3>
+                <div id="recentEventsList" class="space-y-4">
+                    <p class="text-gray-500 text-center py-8">No events yet. Create your first event!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Creation Wizard -->
+        <div id="createEventSection" style="display: none;" class="container mx-auto px-4 py-6">
+            <div class="max-w-2xl mx-auto">
+                <div class="mb-6">
+                    <button onclick="showDashboard()" class="text-blue-600 hover:text-blue-800 flex items-center mb-4">
+                        <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                    </button>
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">Create New Event</h2>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 25%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">Step <span id="currentStep">1</span> of 4</p>
+                </div>
+
+                <!-- Step 1: Basic Information -->
+                <div id="step1" class="bg-white rounded-lg shadow-lg p-6">
+                    <h3 class="text-xl font-bold mb-4">Basic Event Information</h3>
+                    <form id="basicInfoForm">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Event Name</label>
+                                <input type="text" id="eventName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Location</label>
+                                <input type="text" id="eventLocation" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Date</label>
+                                <input type="date" id="eventDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label class="block text-gray-700 text-sm font-bold mb-2">Time</label>
+                                <input type="time" id="eventTime" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button type="button" onclick="nextStep()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                                Next <i class="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Step 2: Guest Management Strategy -->
+                <div id="step2" class="bg-white rounded-lg shadow-lg p-6" style="display: none;">
+                    <h3 class="text-xl font-bold mb-4">Guest Management Strategy</h3>
+                    <div class="space-y-4 mb-6">
+                        <div class="border rounded-lg p-4 cursor-pointer hover:bg-blue-50 transition-colors" onclick="selectStrategy('self-registration')">
+                            <input type="radio" name="strategy" value="self-registration" id="selfReg" class="mr-3">
+                            <label for="selfReg" class="cursor-pointer">
+                                <div class="inline-block">
+                                    <h4 class="font-bold text-blue-600">Self-Registration by Guests</h4>
+                                    <p class="text-gray-600 text-sm">Guests register themselves using a public link</p>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="border rounded-lg p-4 cursor-pointer hover:bg-blue-50 transition-colors" onclick="selectStrategy('organizer-list')">
+                            <input type="radio" name="strategy" value="organizer-list" id="orgList" class="mr-3">
+                            <label for="orgList" class="cursor-pointer">
+                                <div class="inline-block">
+                                    <h4 class="font-bold text-blue-600">Organizer Manages Guest List</h4>
+                                    <p class="text-gray-600 text-sm">You manually add guests or import from CSV/Excel</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="capacitySection" style="display: none;" class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Maximum Guest Capacity</label>
+                        <input type="number" id="maxCapacity" min="1" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                        <p class="text-gray-500 text-xs mt-1">Leave empty for unlimited capacity</p>
+                    </div>
+
+                    <div class="flex justify-between">
+                        <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">
+                            <i class="fas fa-arrow-left mr-2"></i>Previous
+                        </button>
+                        <button type="button" onclick="nextStep()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                            Next <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Hall Layout Designer -->
+                <div id="step3" class="bg-white rounded-lg shadow-lg p-6" style="display: none;">
+                    <h3 class="text-xl font-bold mb-4">Design Hall Layout</h3>
+                    <div class="mb-4">
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            <button type="button" onclick="addTable('round', 8)" class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600">
+                                <i class="fas fa-circle mr-1"></i>Round Table (8)
+                            </button>
+                            <button type="button" onclick="addTable('round', 10)" class="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600">
+                                <i class="fas fa-circle mr-1"></i>Round Table (10)
+                            </button>
+                            <button type="button" onclick="addTable('rectangular', 6)" class="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600">
+                                <i class="fas fa-square mr-1"></i>Rectangular (6)
+                            </button>
+                            <button type="button" onclick="clearLayout()" class="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600">
+                                <i class="fas fa-trash mr-1"></i>Clear All
+                            </button>
+                        </div>
+                    </div>
+                    <div id="hallCanvas" class="hall-canvas border-2 border-gray-300 rounded-lg relative bg-gray-100 mx-auto" style="width: 600px; height: 400px; max-width: 100%;">
+                        <div class="absolute top-2 left-2 text-xs text-gray-500">Drag tables to arrange your hall layout</div>
+                    </div>
+                    <div class="flex justify-between mt-6">
+                        <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">
+                            <i class="fas fa-arrow-left mr-2"></i>Previous
+                        </button>
+                        <button type="button" onclick="nextStep()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                            Next <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Review and Create -->
+                <div id="step4" class="bg-white rounded-lg shadow-lg p-6" style="display: none;">
+                    <h3 class="text-xl font-bold mb-4">Review Event Details</h3>
+                    <div id="eventSummary" class="space-y-4 mb-6">
+                        <!-- Event summary will be populated here -->
+                    </div>
+                    <div class="flex justify-between">
+                        <button type="button" onclick="prevStep()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">
+                            <i class="fas fa-arrow-left mr-2"></i>Previous
+                        </button>
+                        <button type="button" onclick="createEvent()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center">
+                            <span>Create Event</span>
+                            <div id="createSpinner" class="loading-spinner ml-2" style="display: none;"></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Management -->
+        <div id="eventManagementSection" style="display: none;" class="container mx-auto px-4 py-6">
+            <div class="mb-6">
+                <button onclick="showDashboard()" class="text-blue-600 hover:text-blue-800 flex items-center mb-4">
+                    <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+                </button>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 class="text-3xl font-bold text-gray-800 mb-2" id="eventTitle">Event Management</h2>
+                        <p class="text-gray-600" id="eventDetails"></p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-4 md:mt-0">
+                        <button onclick="showGuestManagement()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                            <i class="fas fa-users mr-1"></i>Guests
+                        </button>
+                        <button onclick="showHallLayout()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                            <i class="fas fa-map mr-1"></i>Layout
+                        </button>
+                        <button onclick="showCheckinInterface()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm">
+                            <i class="fas fa-qrcode mr-1"></i>Check-in
+                        </button>
+                        <button onclick="showAnalytics()" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm">
+                            <i class="fas fa-chart-bar mr-1"></i>Analytics
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guest Management Tab -->
+            <div id="guestManagementTab" class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                    <h3 class="text-xl font-bold mb-4 md:mb-0">Guest Management</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="addGuestBtn" onclick="showAddGuestModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm" style="display: none;">
+                            <i class="fas fa-plus mr-1"></i>Add Guest
+                        </button>
+                        <button id="importGuestsBtn" onclick="showImportModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm" style="display: none;">
+                            <i class="fas fa-upload mr-1"></i>Import CSV
+                        </button>
+                        <button onclick="generateRegistrationLink()" id="regLinkBtn" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm" style="display: none;">
+                            <i class="fas fa-link mr-1"></i>Registration Link
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Registration Link Display -->
+                <div id="registrationLinkDisplay" style="display: none;" class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                    <h4 class="font-bold text-blue-800 mb-2">Public Registration Link</h4>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" id="registrationUrl" readonly class="flex-1 px-3 py-2 border rounded-lg bg-white">
+                        <button onclick="copyRegistrationLink()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                    <p class="text-blue-600 text-sm mt-2">Share this link with guests so they can register themselves</p>
+                </div>
+
+                <!-- Guest List -->
+                <div class="mb-4">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
+                        <input type="text" id="guestSearch" placeholder="Search guests..." class="px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 mb-2 md:mb-0 md:w-1/3">
+                        <div class="text-sm text-gray-600">
+                            Total: <span id="totalGuestCount">0</span> | 
+                            Checked In: <span id="checkedInCount">0</span> | 
+                            Pending: <span id="pendingCount">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="guestList" class="space-y-2 max-h-96 overflow-y-auto">
+                    <p class="text-gray-500 text-center py-8">No guests yet</p>
+                </div>
+            </div>
+
+            <!-- Hall Layout Tab -->
+            <div id="hallLayoutTab" style="display: none;" class="bg-white rounded-lg shadow-lg p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-xl font-bold">Hall Layout & Table Assignments</h3>
+                    <button onclick="editHallLayout()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                        <i class="fas fa-edit mr-1"></i>Edit Layout
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2">
+                        <div id="hallLayoutDisplay" class="hall-canvas border-2 border-gray-300 rounded-lg relative bg-gray-100" style="width: 100%; height: 400px;">
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-4">Unassigned Guests</h4>
+                        <div id="unassignedGuests" class="space-y-2 max-h-96 overflow-y-auto">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Check-in Interface Tab -->
+            <div id="checkinTab" style="display: none;" class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-6">Guest Check-in</h3>
+                
+                <!-- Self-Registration Check-in -->
+                <div id="selfRegCheckin" style="display: none;">
+                    <div class="text-center mb-6">
+                        <p class="text-gray-600 mb-4">Scan guest QR codes to check them in</p>
+                        <button onclick="startQRScanner()" id="startScanBtn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-camera mr-2"></i>Start QR Scanner
+                        </button>
+                    </div>
+                    <div class="scanner-container" id="qrScannerContainer" style="display: none;">
+                        <div id="qr-reader"></div>
+                        <button onclick="stopQRScanner()" class="w-full mt-4 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">
+                            Stop Scanner
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Organizer List Check-in -->
+                <div id="orgListCheckin" style="display: none;">
+                    <div class="mb-6">
+                        <div class="text-center mb-4">
+                            <div id="eventQRCode" class="flex justify-center mb-4"></div>
+                            <p class="text-gray-600">Scan this QR code to access check-in mode, or search for guests below</p>
+                        </div>
+                        <div class="max-w-md mx-auto">
+                            <input type="text" id="checkinSearch" placeholder="Search guest name..." class="w-full px-4 py-3 border rounded-lg focus:outline-none focus:border-blue-500 text-lg">
+                            <div id="checkinSearchResults" class="mt-2 space-y-2 max-h-64 overflow-y-auto"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Check-in Results -->
+                <div id="checkinResults" class="mt-6" style="display: none;">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="flex items-center">
+                            <i class="fas fa-check-circle text-green-600 text-xl mr-3"></i>
+                            <div>
+                                <h4 class="font-bold text-green-800" id="checkinGuestName">Guest Name</h4>
+                                <p class="text-green-600" id="checkinGuestTable">Table Assignment</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analyticsTab" style="display: none;" class="bg-white rounded-lg shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-6">Event Analytics</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-bold mb-4">Attendance Overview</h4>
+                        <canvas id="attendanceChart" style="height: 300px;"></canvas>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-4">Table Occupancy</h4>
+                        <canvas id="tableChart" style="height: 300px;"></canvas>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <h4 class="font-bold mb-4">Check-in Timeline</h4>
+                    <canvas id="timelineChart" style="height: 200px;"></canvas>
+                </div>
+                <div class="mt-6 flex justify-center">
+                    <button onclick="exportGuestList()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                        <i class="fas fa-download mr-2"></i>Export Guest List
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Public Registration Page -->
+        <div id="publicRegistrationSection" style="display: none;" class="min-h-screen flex items-center justify-center">
+            <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md mx-4">
+                <div class="text-center mb-6">
+                    <i class="fas fa-calendar-check text-4xl text-blue-600 mb-4"></i>
+                    <h2 class="text-2xl font-bold text-gray-800" id="publicEventName">Event Registration</h2>
+                    <p class="text-gray-600 mt-2" id="publicEventDetails"></p>
+                </div>
+                
+                <form id="publicRegistrationForm" onsubmit="handlePublicRegistration(event)">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Full Name *</label>
+                        <input type="text" id="publicGuestName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email *</label>
+                        <input type="email" id="publicGuestEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Phone Number</label>
+                        <input type="tel" id="publicGuestPhone" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Dietary Restrictions</label>
+                        <textarea id="publicGuestDietary" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 h-20" placeholder="Any dietary restrictions or allergies..."></textarea>
+                    </div>
+                    <div id="capacityWarning" class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4" style="display: none;">
+                        <p class="text-yellow-800 text-sm"><i class="fas fa-exclamation-triangle mr-2"></i>Limited spots remaining!</p>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center">
+                        <span id="publicRegBtnText">Register for Event</span>
+                        <div id="publicRegSpinner" class="loading-spinner ml-2" style="display: none;"></div>
+                    </button>
+                </form>
+                
+                <div id="registrationSuccess" style="display: none;" class="text-center">
+                    <i class="fas fa-check-circle text-green-500 text-6xl mb-4"></i>
+                    <h3 class="text-xl font-bold text-green-800 mb-2">Registration Successful!</h3>
+                    <p class="text-gray-600 mb-4">Your QR code has been sent to your email.</p>
+                    <div id="guestQRCode" class="flex justify-center mb-4"></div>
+                    <p class="text-sm text-gray-500">Save this QR code for event check-in</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Add Guest Modal -->
+    <div id="addGuestModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg shadow-lg w-full max-w-md mx-4">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold">Add New Guest</h3>
+                    <button onclick="closeAddGuestModal()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="addGuestForm" onsubmit="addNewGuest(event)">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Full Name *</label>
+                        <input type="text" id="newGuestName" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Email</label>
+                        <input type="email" id="newGuestEmail" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Phone</label>
+                        <input type="tel" id="newGuestPhone" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Notes</label>
+                        <textarea id="newGuestNotes" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:border-blue-500 h-20"></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" onclick="closeAddGuestModal()" class="px-4 py-2 text-gray-600 border rounded-lg hover:bg-gray-50">Cancel</button>
+                        <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Guest</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2"></div>
+
+    <script>
+        // Global Variables
+        let currentUser = null;
+        let currentEvent = null;
+        let currentEventId = null;
+        let wizardStep = 1;
+        let tables = [];
+        let tableCounter = 0;
+        let qrScanner = null;
+        let charts = {};
+
+        // Initialize Application
+        function initApp() {
+            // Check if user is logged in
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                showMainApp();
+            } else {
+                showAuth();
+            }
+            
+            // Set up demo data if needed
+            initDemoData();
+        }
+
+        // Authentication Functions
+        function switchAuthTab(tab) {
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+
+            if (tab === 'login') {
+                loginTab.className = 'flex-1 py-2 text-center rounded-lg bg-blue-600 text-white';
+                registerTab.className = 'flex-1 py-2 text-center rounded-lg text-gray-600';
+                loginForm.style.display = 'block';
+                registerForm.style.display = 'none';
+            } else {
+                registerTab.className = 'flex-1 py-2 text-center rounded-lg bg-blue-600 text-white';
+                loginTab.className = 'flex-1 py-2 text-center rounded-lg text-gray-600';
+                registerForm.style.display = 'block';
+                loginForm.style.display = 'none';
+            }
+        }
+
+        function handleLogin(event) {
+            event.preventDefault();
+            showSpinner('loginBtnText', 'loginSpinner');
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            setTimeout(() => {
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const user = users.find(u => u.email === email && u.password === password);
+
+                if (user || (email === 'demo@example.com' && password === 'password123')) {
+                    const userData = user || { id: 'demo', name: 'Demo User', email: 'demo@example.com' };
+                    currentUser = userData;
+                    localStorage.setItem('currentUser', JSON.stringify(userData));
+                    showMainApp();
+                    showToast('Login successful!', 'success');
+                } else {
+                    showToast('Invalid credentials', 'error');
+                }
+                hideSpinner('loginBtnText', 'loginSpinner');
+            }, 1000);
+        }
+
+        function handleRegister(event) {
+            event.preventDefault();
+            showSpinner('registerBtnText', 'registerSpinner');
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+
+            setTimeout(() => {
+                const users = JSON.parse(localStorage.getItem('users') || '[]');
+                const existingUser = users.find(u => u.email === email);
+
+                if (existingUser) {
+                    showToast('Email already registered', 'error');
+                } else {
+                    const newUser = {
+                        id: generateId(),
+                        name,
+                        email,
+                        password
+                    };
+                    users.push(newUser);
+                    localStorage.setItem('users', JSON.stringify(users));
+                    
+                    currentUser = newUser;
+                    localStorage.setItem('currentUser', JSON.stringify(newUser));
+                    showMainApp();
+                    showToast('Account created successfully!', 'success');
+                }
+                hideSpinner('registerBtnText', 'registerSpinner');
+            }, 1000);
+        }
+
+        function logout() {
+            currentUser = null;
+            currentEvent = null;
+            currentEventId = null;
+            localStorage.removeItem('currentUser');
+            showAuth();
+            showToast('Logged out successfully', 'success');
+        }
+
+        // Navigation Functions
+        function showAuth() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('navigation').style.display = 'none';
+            document.getElementById('publicRegistrationSection').style.display = 'none';
+        }
+
+        function showMainApp() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+            document.getElementById('navigation').style.display = 'block';
+            document.getElementById('publicRegistrationSection').style.display = 'none';
+            document.getElementById('userEmail').textContent = currentUser.email;
+            showDashboard();
+        }
+
+        function showDashboard() {
+            hideAllSections();
+            document.getElementById('dashboardSection').style.display = 'block';
+            updateDashboardStats();
+            loadRecentEvents();
+        }
+
+        function showCreateEvent() {
+            hideAllSections();
+            document.getElementById('createEventSection').style.display = 'block';
+            resetWizard();
+        }
+
+        function showEventManagement(eventId) {
+            currentEventId = eventId;
+            currentEvent = getEventById(eventId);
+            
+            if (!currentEvent) {
+                showToast('Event not found', 'error');
+                showDashboard();
+                return;
+            }
+
+            hideAllSections();
+            document.getElementById('eventManagementSection').style.display = 'block';
+            document.getElementById('eventTitle').textContent = currentEvent.name;
+            document.getElementById('eventDetails').textContent = `${currentEvent.date} at ${currentEvent.time} - ${currentEvent.location}`;
+            
+            showGuestManagement();
+        }
+
+        function showGuestManagement() {
+            hideEventTabs();
+            document.getElementById('guestManagementTab').style.display = 'block';
+            setupGuestManagement();
+            loadGuestList();
+        }
+
+        function showHallLayout() {
+            hideEventTabs();
+            document.getElementById('hallLayoutTab').style.display = 'block';
+            displayHallLayout();
+            loadUnassignedGuests();
+        }
+
+        function showCheckinInterface() {
+            hideEventTabs();
+            document.getElementById('checkinTab').style.display = 'block';
+            setupCheckinInterface();
+        }
+
+        function showAnalytics() {
+            hideEventTabs();
+            document.getElementById('analyticsTab').style.display = 'block';
+            setupAnalytics();
+        }
+
+        function hideAllSections() {
+            const sections = ['dashboardSection', 'createEventSection', 'eventManagementSection'];
+            sections.forEach(section => {
+                document.getElementById(section).style.display = 'none';
+            });
+        }
+
+        function hideEventTabs() {
+            const tabs = ['guestManagementTab', 'hallLayoutTab', 'checkinTab', 'analyticsTab'];
+            tabs.forEach(tab => {
+                document.getElementById(tab).style.display = 'none';
+            });
+        }
+
+        // Event Creation Wizard
+        function resetWizard() {
+            wizardStep = 1;
+            updateWizardProgress();
+            showStep(1);
+            document.getElementById('basicInfoForm').reset();
+            tables = [];
+            tableCounter = 0;
+            clearHallCanvas();
+        }
+
+        function updateWizardProgress() {
+            const progress = (wizardStep / 4) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+            document.getElementById('currentStep').textContent = wizardStep;
+        }
+
+        function showStep(step) {
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`step${i}`).style.display = i === step ? 'block' : 'none';
+            }
+        }
+
+        function nextStep() {
+            if (validateCurrentStep()) {
+                wizardStep++;
+                updateWizardProgress();
+                showStep(wizardStep);
+                
+                if (wizardStep === 4) {
+                    updateEventSummary();
+                }
+            }
+        }
+
+        function prevStep() {
+            wizardStep--;
+            updateWizardProgress();
+            showStep(wizardStep);
+        }
+
+        function validateCurrentStep() {
+            switch (wizardStep) {
+                case 1:
+                    const form = document.getElementById('basicInfoForm');
+                    return form.checkValidity();
+                case 2:
+                    const strategy = document.querySelector('input[name="strategy"]:checked');
+                    if (!strategy) {
+                        showToast('Please select a guest management strategy', 'error');
+                        return false;
+                    }
+                    return true;
+                case 3:
+                    return true; // Hall layout is optional
+                default:
+                    return true;
+            }
+        }
+
+        function selectStrategy(strategy) {
+            document.getElementById('selfReg').checked = strategy === 'self-registration';
+            document.getElementById('orgList').checked = strategy === 'organizer-list';
+            
+            const capacitySection = document.getElementById('capacitySection');
+            capacitySection.style.display = strategy === 'self-registration' ? 'block' : 'none';
+        }
+
+        function updateEventSummary() {
+            const eventName = document.getElementById('eventName').value;
+            const eventDate = document.getElementById('eventDate').value;
+            const eventTime = document.getElementById('eventTime').value;
+            const eventLocation = document.getElementById('eventLocation').value;
+            const strategy = document.querySelector('input[name="strategy"]:checked').value;
+            const maxCapacity = document.getElementById('maxCapacity').value;
+
+            const summary = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="font-bold text-gray-700">Event Name</h4>
+                        <p class="text-gray-600">${eventName}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-700">Location</h4>
+                        <p class="text-gray-600">${eventLocation}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-700">Date & Time</h4>
+                        <p class="text-gray-600">${eventDate} at ${eventTime}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-gray-700">Guest Management</h4>
+                        <p class="text-gray-600">${strategy === 'self-registration' ? 'Self-Registration' : 'Organizer Managed'}</p>
+                    </div>
+                    ${maxCapacity ? `
+                    <div>
+                        <h4 class="font-bold text-gray-700">Max Capacity</h4>
+                        <p class="text-gray-600">${maxCapacity} guests</p>
+                    </div>
+                    ` : ''}
+                    <div>
+                        <h4 class="font-bold text-gray-700">Tables</h4>
+                        <p class="text-gray-600">${tables.length} tables configured</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('eventSummary').innerHTML = summary;
+        }
+
+        function createEvent() {
+            showSpinner('createSpinner');
+            
+            setTimeout(() => {
+                const eventData = {
+                    id: generateId(),
+                    name: document.getElementById('eventName').value,
+                    date: document.getElementById('eventDate').value,
+                    time: document.getElementById('eventTime').value,
+                    location: document.getElementById('eventLocation').value,
+                    strategy: document.querySelector('input[name="strategy"]:checked').value,
+                    maxCapacity: document.getElementById('maxCapacity').value || null,
+                    tables: [...tables],
+                    createdBy: currentUser.id,
+                    createdAt: new Date().toISOString(),
+                    qrCode: generateId() // For organizer-managed events
+                };
+
+                // Save event
+                const events = JSON.parse(localStorage.getItem('events') || '[]');
+                events.push(eventData);
+                localStorage.setItem('events', JSON.stringify(events));
+
+                hideSpinner('createSpinner');
+                showToast('Event created successfully!', 'success');
+                showEventManagement(eventData.id);
+            }, 1500);
+        }
+
+        // Hall Layout Designer
+        function addTable(shape, capacity) {
+            tableCounter++;
+            const tableId = `table_${tableCounter}`;
+            
+            const table = {
+                id: tableId,
+                name: `Table ${tableCounter}`,
+                shape: shape,
+                capacity: capacity,
+                x: 50 + (tables.length * 80) % 500,
+                y: 50 + Math.floor(tables.length / 6) * 80,
+                assignedGuests: [],
+                rotation: 0
+            };
+
+            tables.push(table);
+            renderTable(table);
+        }
+
+        function renderTable(table) {
+            const canvas = document.getElementById('hallCanvas');
+            const tableElement = document.createElement('div');
+            tableElement.id = table.id;
+            tableElement.className = 'table-element absolute';
+            tableElement.style.left = table.x + 'px';
+            tableElement.style.top = table.y + 'px';
+            tableElement.style.width = (table.shape === 'round' ? '60px' : '80px');
+            tableElement.style.height = (table.shape === 'round' ? '60px' : '40px');
+            tableElement.style.borderRadius = table.shape === 'round' ? '50%' : '8px';
+            tableElement.innerHTML = `
+                <div class="text-xs text-center">
+                    <div>${table.name}</div>
+                    <div>(${table.capacity})</div>
+                </div>
+            `;
+
+            // Make draggable
+            let isDragging = false;
+            let startX, startY, startLeft, startTop;
+
+            tableElement.addEventListener('mousedown', startDrag);
+            tableElement.addEventListener('touchstart', startDrag);
+
+            function startDrag(e) {
+                isDragging = true;
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                
+                startX = clientX;
+                startY = clientY;
+                startLeft = table.x;
+                startTop = table.y;
+
+                document.addEventListener('mousemove', drag);
+                document.addEventListener('touchmove', drag);
+                document.addEventListener('mouseup', stopDrag);
+                document.addEventListener('touchend', stopDrag);
+                
+                e.preventDefault();
+            }
+
+            function drag(e) {
+                if (!isDragging) return;
+                
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                
+                const deltaX = clientX - startX;
+                const deltaY = clientY - startY;
+                
+                const newX = Math.max(0, Math.min(startLeft + deltaX, canvas.offsetWidth - 80));
+                const newY = Math.max(0, Math.min(startTop + deltaY, canvas.offsetHeight - 60));
+                
+                table.x = newX;
+                table.y = newY;
+                
+                tableElement.style.left = newX + 'px';
+                tableElement.style.top = newY + 'px';
+            }
+
+            function stopDrag() {
+                isDragging = false;
+                document.removeEventListener('mousemove', drag);
+                document.removeEventListener('touchmove', drag);
+                document.removeEventListener('mouseup', stopDrag);
+                document.removeEventListener('touchend', stopDrag);
+            }
+
+            // Double click to edit
+            tableElement.addEventListener('dblclick', () => editTable(table));
+
+            canvas.appendChild(tableElement);
+        }
+
+        function editTable(table) {
+            const newName = prompt('Enter table name:', table.name);
+            if (newName && newName.trim()) {
+                table.name = newName.trim();
+                document.getElementById(table.id).querySelector('div').innerHTML = `
+                    <div>${table.name}</div>
+                    <div>(${table.capacity})</div>
+                `;
+            }
+        }
+
+        function clearLayout() {
+            if (confirm('Are you sure you want to clear all tables?')) {
+                tables = [];
+                tableCounter = 0;
+                clearHallCanvas();
+            }
+        }
+
+        function clearHallCanvas() {
+            const canvas = document.getElementById('hallCanvas');
+            const tables = canvas.querySelectorAll('.table-element');
+            tables.forEach(table => table.remove());
+        }
+
+        // Guest Management
+        function setupGuestManagement() {
+            const strategy = currentEvent.strategy;
+            const addGuestBtn = document.getElementById('addGuestBtn');
+            const importGuestsBtn = document.getElementById('importGuestsBtn');
+            const regLinkBtn = document.getElementById('regLinkBtn');
+
+            if (strategy === 'organizer-list') {
+                addGuestBtn.style.display = 'inline-block';
+                importGuestsBtn.style.display = 'inline-block';
+                regLinkBtn.style.display = 'none';
+                document.getElementById('registrationLinkDisplay').style.display = 'none';
+            } else {
+                addGuestBtn.style.display = 'none';
+                importGuestsBtn.style.display = 'none';
+                regLinkBtn.style.display = 'inline-block';
+            }
+
+            // Setup search
+            const searchInput = document.getElementById('guestSearch');
+            searchInput.addEventListener('input', filterGuests);
+        }
+
+        function loadGuestList() {
+            const guests = getEventGuests(currentEventId);
+            displayGuests(guests);
+            updateGuestCounts(guests);
+        }
+
+        function displayGuests(guests) {
+            const guestList = document.getElementById('guestList');
+            
+            if (guests.length === 0) {
+                guestList.innerHTML = '<p class="text-gray-500 text-center py-8">No guests yet</p>';
+                return;
+            }
+
+            guestList.innerHTML = guests.map(guest => `
+                <div class="guest-item bg-gray-50 p-4 rounded-lg border flex items-center justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center">
+                            <h4 class="font-bold text-gray-800">${guest.name}</h4>
+                            <span class="ml-2 px-2 py-1 text-xs rounded-full ${guest.checkedIn ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${guest.checkedIn ? 'Checked In' : 'Pending'}
+                            </span>
+                        </div>
+                        <p class="text-gray-600 text-sm">${guest.email || 'No email'}</p>
+                        ${guest.assignedTable ? `<p class="text-blue-600 text-sm">Table: ${guest.assignedTable}</p>` : '<p class="text-gray-500 text-sm">No table assigned</p>'}
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${!guest.checkedIn ? `<button onclick="checkInGuest('${guest.id}')" class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">Check In</button>` : ''}
+                        <button onclick="editGuest('${guest.id}')" class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="deleteGuest('${guest.id}')" class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateGuestCounts(guests) {
+            const total = guests.length;
+            const checkedIn = guests.filter(g => g.checkedIn).length;
+            const pending = total - checkedIn;
+
+            document.getElementById('totalGuestCount').textContent = total;
+            document.getElementById('checkedInCount').textContent = checkedIn;
+            document.getElementById('pendingCount').textContent = pending;
+        }
+
+        function filterGuests() {
+            const searchTerm = document.getElementById('guestSearch').value.toLowerCase();
+            const guests = getEventGuests(currentEventId);
+            const filteredGuests = guests.filter(guest => 
+                guest.name.toLowerCase().includes(searchTerm) ||
+                (guest.email && guest.email.toLowerCase().includes(searchTerm))
+            );
+            displayGuests(filteredGuests);
+        }
+
+        function generateRegistrationLink() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const registrationUrl = `${baseUrl}?register=${currentEventId}`;
+            
+            document.getElementById('registrationUrl').value = registrationUrl;
+            document.getElementById('registrationLinkDisplay').style.display = 'block';
+        }
+
+        function copyRegistrationLink() {
+            const urlInput = document.getElementById('registrationUrl');
+            urlInput.select();
+            document.execCommand('copy');
+            showToast('Registration link copied to clipboard!', 'success');
+        }
+
+        // Guest CRUD Operations
+        function showAddGuestModal() {
+            document.getElementById('addGuestModal').style.display = 'flex';
+        }
+
+        function closeAddGuestModal() {
+            document.getElementById('addGuestModal').style.display = 'none';
+            document.getElementById('addGuestForm').reset();
+        }
+
+        function addNewGuest(event) {
+            event.preventDefault();
+            
+            const guestData = {
+                id: generateId(),
+                eventId: currentEventId,
+                name: document.getElementById('newGuestName').value,
+                email: document.getElementById('newGuestEmail').value,
+                phone: document.getElementById('newGuestPhone').value,
+                notes: document.getElementById('newGuestNotes').value,
+                checkedIn: false,
+                checkInTime: null,
+                assignedTable: null,
+                qrCode: generateId(),
+                registeredBy: 'organizer'
+            };
+
+            const guests = JSON.parse(localStorage.getItem('guests') || '[]');
+            guests.push(guestData);
+            localStorage.setItem('guests', JSON.stringify(guests));
+
+            closeAddGuestModal();
+            loadGuestList();
+            showToast('Guest added successfully!', 'success');
+        }
+
+        function checkInGuest(guestId) {
+            const guests = JSON.parse(localStorage.getItem('guests') || '[]');
+            const guestIndex = guests.findIndex(g => g.id === guestId);
+            
+            if (guestIndex !== -1) {
+                guests[guestIndex].checkedIn = true;
+                guests[guestIndex].checkInTime = new Date().toISOString();
+                localStorage.setItem('guests', JSON.stringify(guests));
+                
+                loadGuestList();
+                showToast('Guest checked in successfully!', 'success');
+            }
+        }
+
+        function deleteGuest(guestId) {
+            if (confirm('Are you sure you want to delete this guest?')) {
+                const guests = JSON.parse(localStorage.getItem('guests') || '[]');
+                const filteredGuests = guests.filter(g => g.id !== guestId);
+                localStorage.setItem('guests', JSON.stringify(filteredGuests));
+                
+                loadGuestList();
+                showToast('Guest deleted successfully!', 'success');
+            }
+        }
+
+        // QR Code Functions
+        function generateGuestQRCode(guestData) {
+            const qrData = JSON.stringify({
+                guestId: guestData.id,
+                eventId: guestData.eventId,
+                name: guestData.name,
+                timestamp: Date.now()
+            });
+            
+            return qrData;
+        }
+
+        function displayQRCode(elementId, data) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            
+            QRCode.toCanvas(data, { width: 200, margin: 2 }, (err, canvas) => {
+                if (err) {
+                    console.error(err);
+                    return;
+                }
+                container.appendChild(canvas);
+            });
+        }
+
+        // Check-in Interface
+        function setupCheckinInterface() {
+            const strategy = currentEvent.strategy;
+            
+            if (strategy === 'self-registration') {
+                document.getElementById('selfRegCheckin').style.display = 'block';
+                document.getElementById('orgListCheckin').style.display = 'none';
+            } else {
+                document.getElementById('selfRegCheckin').style.display = 'none';
+                document.getElementById('orgListCheckin').style.display = 'block';
+                
+                // Generate event QR code
+                const eventQRData = JSON.stringify({
+                    eventId: currentEventId,
+                    type: 'event_checkin',
+                    timestamp: Date.now()
+                });
+                displayQRCode('eventQRCode', eventQRData);
+                
+                // Setup search
+                const searchInput = document.getElementById('checkinSearch');
+                searchInput.addEventListener('input', searchGuestsForCheckin);
+            }
+        }
+
+        function startQRScanner() {
+            const scannerContainer = document.getElementById('qrScannerContainer');
+            scannerContainer.style.display = 'block';
+            document.getElementById('startScanBtn').style.display = 'none';
+
+            qrScanner = new Html5Qrcode("qr-reader");
+            
+            qrScanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                onScanSuccess,
+                onScanFailure
+            );
+        }
+
+        function stopQRScanner() {
+            if (qrScanner) {
+                qrScanner.stop();
+                qrScanner = null;
+            }
+            document.getElementById('qrScannerContainer').style.display = 'none';
+            document.getElementById('startScanBtn').style.display = 'block';
+        }
+
+        function onScanSuccess(decodedText) {
+            try {
+                const qrData = JSON.parse(decodedText);
+                
+                if (qrData.eventId === currentEventId) {
+                    // Valid guest QR code
+                    processGuestCheckin(qrData.guestId);
+                } else {
+                    showToast('Invalid QR code for this event', 'error');
+                }
+            } catch (error) {
+                showToast('Invalid QR code format', 'error');
+            }
+        }
+
+        function onScanFailure(error) {
+            // Ignore scan failures - they're common
+        }
+
+        function searchGuestsForCheckin() {
+            const searchTerm = document.getElementById('checkinSearch').value.toLowerCase();
+            const resultsContainer = document.getElementById('checkinSearchResults');
+            
+            if (searchTerm.length < 2) {
+                resultsContainer.innerHTML = '';
+                return;
+            }
+
+            const guests = getEventGuests(currentEventId);
+            const matchingGuests = guests.filter(guest => 
+                guest.name.toLowerCase().includes(searchTerm) && !guest.checkedIn
+            );
+
+            if (matchingGuests.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No matching guests found</p>';
+                return;
+            }
+
+            resultsContainer.innerHTML = matchingGuests.map(guest => `
+                <div class="bg-white border rounded-lg p-3 cursor-pointer hover:bg-blue-50" onclick="processGuestCheckin('${guest.id}')">
+                    <div class="font-bold">${guest.name}</div>
+                    <div class="text-sm text-gray-600">${guest.email || 'No email'}</div>
+                    ${guest.assignedTable ? `<div class="text-sm text-blue-600">Table: ${guest.assignedTable}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function processGuestCheckin(guestId) {
+            const guests = JSON.parse(localStorage.getItem('guests') || '[]');
+            const guestIndex = guests.findIndex(g => g.id === guestId);
+            
+            if (guestIndex === -1) {
+                showToast('Guest not found', 'error');
+                return;
+            }
+
+            const guest = guests[guestIndex];
+            
+            if (guest.checkedIn) {
+                showToast('Guest already checked in', 'warning');
+                return;
+            }
+
+            // Check in the guest
+            guests[guestIndex].checkedIn = true;
+            guests[guestIndex].checkInTime = new Date().toISOString();
+            localStorage.setItem('guests', JSON.stringify(guests));
+
+            // Display success
+            document.getElementById('checkinGuestName').textContent = guest.name;
+            document.getElementById('checkinGuestTable').textContent = guest.assignedTable ? `Table: ${guest.assignedTable}` : 'No table assigned';
+            document.getElementById('checkinResults').style.display = 'block';
+
+            // Clear search
+            document.getElementById('checkinSearch').value = '';
+            document.getElementById('checkinSearchResults').innerHTML = '';
+
+            showToast('Guest checked in successfully!', 'success');
+
+            // Hide results after 3 seconds
+            setTimeout(() => {
+                document.getElementById('checkinResults').style.display = 'none';
+            }, 3000);
+        }
+
+        // Analytics
+        function setupAnalytics() {
+            const guests = getEventGuests(currentEventId);
+            createAttendanceChart(guests);
+            createTableChart();
+            createTimelineChart(guests);
+        }
+
+        function createAttendanceChart(guests) {
+            const ctx = document.getElementById('attendanceChart').getContext('2d');
+            
+            if (charts.attendance) {
+                charts.attendance.destroy();
+            }
+
+            const checkedIn = guests.filter(g => g.checkedIn).length;
+            const pending = guests.length - checkedIn;
+
+            charts.attendance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Checked In', 'Pending'],
+                    datasets: [{
+                        data: [checkedIn, pending],
+                        backgroundColor: ['#10B981', '#F59E0B'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTableChart() {
+            const ctx = document.getElementById('tableChart').getContext('2d');
+            
+            if (charts.table) {
+                charts.table.destroy();
+            }
+
+            const guests = getEventGuests(currentEventId);
+            const tableData = currentEvent.tables.map(table => {
+                const assignedGuests = guests.filter(g => g.assignedTable === table.name);
+                return {
+                    name: table.name,
+                    capacity: table.capacity,
+                    occupied: assignedGuests.length
+                };
+            });
+
+            charts.table = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: tableData.map(t => t.name),
+                    datasets: [
+                        {
+                            label: 'Capacity',
+                            data: tableData.map(t => t.capacity),
+                            backgroundColor: '#E5E7EB'
+                        },
+                        {
+                            label: 'Occupied',
+                            data: tableData.map(t => t.occupied),
+                            backgroundColor: '#3B82F6'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTimelineChart(guests) {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            
+            if (charts.timeline) {
+                charts.timeline.destroy();
+            }
+
+            const checkedInGuests = guests.filter(g => g.checkedIn && g.checkInTime);
+            const hourlyData = {};
+
+            checkedInGuests.forEach(guest => {
+                const hour = new Date(guest.checkInTime).getHours();
+                hourlyData[hour] = (hourlyData[hour] || 0) + 1;
+            });
+
+            const hours = Array.from({length: 24}, (_, i) => i);
+            const data = hours.map(hour => hourlyData[hour] || 0);
+
+            charts.timeline = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hours.map(h => `${h}:00`),
+                    datasets: [{
+                        label: 'Check-ins',
+                        data: data,
+                        borderColor: '#8B5CF6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // Public Registration
+        function handlePublicRegistration(event) {
+            event.preventDefault();
+            showSpinner('publicRegBtnText', 'publicRegSpinner');
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('register');
+            const eventData = getEventById(eventId);
+
+            if (!eventData) {
+                showToast('Event not found', 'error');
+                hideSpinner('publicRegBtnText', 'publicRegSpinner');
+                return;
+            }
+
+            const guestData = {
+                id: generateId(),
+                eventId: eventId,
+                name: document.getElementById('publicGuestName').value,
+                email: document.getElementById('publicGuestEmail').value,
+                phone: document.getElementById('publicGuestPhone').value,
+                dietary: document.getElementById('publicGuestDietary').value,
+                checkedIn: false,
+                checkInTime: null,
+                assignedTable: null,
+                qrCode: generateId(),
+                registeredBy: 'guest',
+                registrationTime: new Date().toISOString()
+            };
+
+            setTimeout(() => {
+                // Check capacity if set
+                if (eventData.maxCapacity) {
+                    const existingGuests = getEventGuests(eventId);
+                    if (existingGuests.length >= eventData.maxCapacity) {
+                        showToast('Event is at full capacity', 'error');
+                        hideSpinner('publicRegBtnText', 'publicRegSpinner');
+                        return;
+                    }
+                }
+
+                // Save guest
+                const guests = JSON.parse(localStorage.getItem('guests') || '[]');
+                guests.push(guestData);
+                localStorage.setItem('guests', JSON.stringify(guests));
+
+                // Show success
+                document.getElementById('publicRegistrationForm').style.display = 'none';
+                document.getElementById('registrationSuccess').style.display = 'block';
+
+                // Generate and display QR code
+                const qrData = generateGuestQRCode(guestData);
+                displayQRCode('guestQRCode', qrData);
+
+                hideSpinner('publicRegBtnText', 'publicRegSpinner');
+                showToast('Registration successful!', 'success');
+            }, 1500);
+        }
+
+        // Utility Functions
+        function generateId() {
+            return 'id_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+        }
+
+        function showSpinner(textElementId, spinnerElementId) {
+            if (textElementId) {
+                document.getElementById(textElementId).style.display = 'none';
+            }
+            if (spinnerElementId) {
+                document.getElementById(spinnerElementId).style.display = 'block';
+            }
+        }
+
+        function hideSpinner(textElementId, spinnerElementId) {
+            if (textElementId) {
+                document.getElementById(textElementId).style.display = 'block';
+            }
+            if (spinnerElementId) {
+                document.getElementById(spinnerElementId).style.display = 'none';
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            
+            const bgColor = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                warning: 'bg-yellow-500',
+                info: 'bg-blue-500'
+            }[type];
+
+            toast.className = `${bgColor} text-white px-6 py-3 rounded-lg shadow-lg transform transition-all duration-300`;
+            toast.innerHTML = `
+                <div class="flex items-center">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-white hover:text-gray-200">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+
+            toastContainer.appendChild(toast);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 5000);
+        }
+
+        function getEventById(eventId) {
+            const events = JSON.parse(localStorage.getItem('events') || '[]');
+            return events.find(e => e.id === eventId);
+        }
+
+        function getEventGuests(eventId) {
+            const guests = JSON.parse(localStorage.getItem('guests') || '[]');
+            return guests.filter(g => g.eventId === eventId);
+        }
+
+        function getUserEvents() {
+            const events = JSON.parse(localStorage.getItem('events') || '[]');
+            return events.filter(e => e.createdBy === currentUser.id);
+        }
+
+        function updateDashboardStats() {
+            const events = getUserEvents();
+            const allGuests = events.flatMap(e => getEventGuests(e.id));
+            const checkedInGuests = allGuests.filter(g => g.checkedIn);
+
+            document.getElementById('totalEvents').textContent = events.length;
+            document.getElementById('totalGuests').textContent = allGuests.length;
+            document.getElementById('checkedInGuests').textContent = checkedInGuests.length;
+            document.getElementById('pendingGuests').textContent = allGuests.length - checkedInGuests.length;
+        }
+
+        function loadRecentEvents() {
+            const events = getUserEvents().slice(-5).reverse();
+            const recentEventsList = document.getElementById('recentEventsList');
+
+            if (events.length === 0) {
+                recentEventsList.innerHTML = '<p class="text-gray-500 text-center py-8">No events yet. Create your first event!</p>';
+                return;
+            }
+
+            recentEventsList.innerHTML = events.map(event => {
+                const guests = getEventGuests(event.id);
+                const checkedIn = guests.filter(g => g.checkedIn).length;
+                
+                return `
+                    <div class="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors" onclick="showEventManagement('${event.id}')">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="font-bold text-gray-800">${event.name}</h4>
+                                <p class="text-gray-600 text-sm">${event.date} at ${event.time}</p>
+                                <p class="text-gray-500 text-sm">${event.location}</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-sm text-gray-600">
+                                    ${guests.length} guests
+                                </div>
+                                <div class="text-sm text-green-600">
+                                    ${checkedIn} checked in
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayHallLayout() {
+            const layoutDisplay = document.getElementById('hallLayoutDisplay');
+            layoutDisplay.innerHTML = '';
+
+            if (!currentEvent.tables || currentEvent.tables.length === 0) {
+                layoutDisplay.innerHTML = '<p class="text-gray-500 text-center py-8">No tables configured</p>';
+                return;
+            }
+
+            currentEvent.tables.forEach(table => {
+                const guests = getEventGuests(currentEventId);
+                const assignedGuests = guests.filter(g => g.assignedTable === table.name);
+                const occupancyPercentage = (assignedGuests.length / table.capacity) * 100;
+                
+                let tableClass = 'table-element';
+                if (occupancyPercentage >= 100) tableClass += ' table-full';
+                else if (occupancyPercentage >= 50) tableClass += ' table-partial';
+
+                const tableElement = document.createElement('div');
+                tableElement.className = tableClass + ' absolute';
+                tableElement.style.left = table.x + 'px';
+                tableElement.style.top = table.y + 'px';
+                tableElement.style.width = (table.shape === 'round' ? '60px' : '80px');
+                tableElement.style.height = (table.shape === 'round' ? '60px' : '40px');
+                tableElement.style.borderRadius = table.shape === 'round' ? '50%' : '8px';
+                tableElement.innerHTML = `
+                    <div class="text-xs text-center">
+                        <div>${table.name}</div>
+                        <div>(${assignedGuests.length}/${table.capacity})</div>
+                    </div>
+                `;
+                
+                tableElement.addEventListener('click', () => showTableGuests(table));
+                layoutDisplay.appendChild(tableElement);
+            });
+        }
+
+        function loadUnassignedGuests() {
+            const guests = getEventGuests(currentEventId);
+            const unassigned = guests.filter(g => !g.assignedTable);
+            const container = document.getElementById('unassignedGuests');
+
+            if (unassigned.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4">All guests assigned</p>';
+                return;
+            }
+
+            container.innerHTML = unassigned.map(guest => `
+                <div class="bg-white border rounded-lg p-2 cursor-move" draggable="true" data-guest-id="${guest.id}">
+                    <div class="font-bold text-sm">${guest.name}</div>
+                    <div class="text-xs text-gray-600">${guest.email || 'No email'}</div>
+                </div>
+            `).join('');
+
+            // Make draggable for table assignment
+            container.querySelectorAll('[draggable="true"]').forEach(item => {
+                item.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', item.dataset.guestId);
+                });
+            });
+        }
+
+        function showTableGuests(table) {
+            const guests = getEventGuests(currentEventId);
+            const tableGuests = guests.filter(g => g.assignedTable === table.name);
+            
+            alert(`Table: ${table.name}\nCapacity: ${table.capacity}\nAssigned Guests:\n${tableGuests.map(g => `- ${g.name}`).join('\n') || 'No guests assigned'}`);
+        }
+
+        function exportGuestList() {
+            const guests = getEventGuests(currentEventId);
+            const csvContent = [
+                ['Name', 'Email', 'Phone', 'Table', 'Checked In', 'Check In Time'],
+                ...guests.map(g => [
+                    g.name,
+                    g.email || '',
+                    g.phone || '',
+                    g.assignedTable || '',
+                    g.checkedIn ? 'Yes' : 'No',
+                    g.checkInTime ? new Date(g.checkInTime).toLocaleString() : ''
+                ])
+            ].map(row => row.join(',')).join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentEvent.name}_guest_list.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        function initDemoData() {
+            // Create demo data if no events exist
+            const events = JSON.parse(localStorage.getItem('events') || '[]');
+            if (events.length === 0 && localStorage.getItem('demoInitialized') !== 'true') {
+                const demoEvent = {
+                    id: 'demo_event_1',
+                    name: 'Annual Company Gala',
+                    date: '2024-12-15',
+                    time: '18:00',
+                    location: 'Grand Ballroom, Luxury Hotel',
+                    strategy: 'self-registration',
+                    maxCapacity: 100,
+                    tables: [
+                        { id: 'table_1', name: 'Table 1', shape: 'round', capacity: 8, x: 50, y: 50, assignedGuests: [], rotation: 0 },
+                        { id: 'table_2', name: 'Table 2', shape: 'round', capacity: 8, x: 150, y: 50, assignedGuests: [], rotation: 0 },
+                        { id: 'table_3', name: 'VIP Table', shape: 'rectangular', capacity: 6, x: 100, y: 150, assignedGuests: [], rotation: 0 }
+                    ],
+                    createdBy: 'demo',
+                    createdAt: new Date().toISOString(),
+                    qrCode: 'demo_qr_code'
+                };
+
+                events.push(demoEvent);
+                localStorage.setItem('events', JSON.stringify(events));
+
+                // Add some demo guests
+                const demoGuests = [
+                    { id: 'guest_1', eventId: 'demo_event_1', name: 'John Doe', email: 'john@example.com', checkedIn: true, checkInTime: new Date().toISOString(), assignedTable: 'Table 1', qrCode: 'qr_1', registeredBy: 'guest' },
+                    { id: 'guest_2', eventId: 'demo_event_1', name: 'Jane Smith', email: 'jane@example.com', checkedIn: false, assignedTable: 'Table 1', qrCode: 'qr_2', registeredBy: 'guest' },
+                    { id: 'guest_3', eventId: 'demo_event_1', name: 'Bob Johnson', email: 'bob@example.com', checkedIn: true, checkInTime: new Date().toISOString(), assignedTable: 'VIP Table', qrCode: 'qr_3', registeredBy: 'organizer' }
+                ];
+
+                localStorage.setItem('guests', JSON.stringify(demoGuests));
+                localStorage.setItem('demoInitialized', 'true');
+            }
+        }
+
+        // Check for public registration URL
+        function checkPublicRegistration() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const eventId = urlParams.get('register');
+            
+            if (eventId) {
+                const event = getEventById(eventId);
+                if (event && event.strategy === 'self-registration') {
+                    document.getElementById('authSection').style.display = 'none';
+                    document.getElementById('mainApp').style.display = 'none';
+                    document.getElementById('navigation').style.display = 'none';
+                    document.getElementById('publicRegistrationSection').style.display = 'block';
+                    
+                    document.getElementById('publicEventName').textContent = event.name;
+                    document.getElementById('publicEventDetails').textContent = `${event.date} at ${event.time} - ${event.location}`;
+                    
+                    // Check capacity
+                    if (event.maxCapacity) {
+                        const guests = getEventGuests(eventId);
+                        const remaining = event.maxCapacity - guests.length;
+                        if (remaining <= 5) {
+                            document.getElementById('capacityWarning').style.display = 'block';
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Initialize the application
+        window.addEventListener('load', () => {
+            if (!checkPublicRegistration()) {
+                initApp();
+            }
+        });
+    </script>
+</body>
+</html>
