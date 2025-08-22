@@ -210,7 +210,7 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
       {/* Check-in Page/QR Code Button */}
       <div className="mb-4">
         <a
-          href={`/events/${eventId}/checkin`}
+          href={`/events/${eventId}/qr`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-block bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition"
@@ -669,33 +669,94 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
       {tab === 'checkin' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h3 className="text-xl font-bold mb-4">Check-in</h3>
+          {/* Search and pagination controls (same UX as Guests tab) */}
+          <div className="flex flex-col md:flex-row md:items-center gap-2 mb-4">
+            <input
+              type="text"
+              className="border rounded px-3 py-2 flex-1"
+              placeholder="Search guests by name or email..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
           {event.guests && event.guests.length > 0 ? (
-            <ul className="divide-y">
-              {event.guests.map((guest: Guest) => (
-                <li key={guest._id || guest.email || guest.name} className="py-2 flex justify-between items-center gap-2">
-                  <span>{guest.name}</span>
-                  <span className="flex gap-2 items-center">
-                    <span className={`px-2 py-1 rounded text-xs ${guest.checkedIn ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{guest.checkedIn ? 'Checked In' : 'Pending'}</span>
-                    <button
-                      className={`px-3 py-1 rounded text-xs ${guest.checkedIn ? 'bg-red-500 text-white' : 'bg-green-600 text-white'} hover:opacity-90`}
-                      onClick={async () => {
-                        setAdding(true);
-                        setError(null);
-                        try {
-                          await toggleGuestCheckin(eventId, guest._id, !guest.checkedIn);
-                          const data = await fetchEventById(eventId);
-                          setEvent(data.event || null);
-                        } catch (err: any) {
-                          setError(err.message || 'Error updating check-in');
-                        }
-                        setAdding(false);
-                      }}
-                      disabled={adding}
-                    >{guest.checkedIn ? 'Undo' : 'Check In'}</button>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            (() => {
+              const filteredGuests = (event.guests || []).filter((guest: any) => {
+                const q = debouncedSearch.trim().toLowerCase();
+                if (!q) return true;
+                return (
+                  (guest.name && guest.name.toLowerCase().includes(q)) ||
+                  (guest.email && guest.email.toLowerCase().includes(q))
+                );
+              });
+              const totalPages = Math.ceil(filteredGuests.length / guestsPerPage) || 1;
+              const startIdx = (currentPage - 1) * guestsPerPage;
+              const paginatedGuests = filteredGuests.slice(startIdx, startIdx + guestsPerPage);
+              return (
+                <React.Fragment>
+                  <ul className="divide-y">
+                    {paginatedGuests.map((guest: Guest) => (
+                      <li key={guest._id || guest.email || guest.name} className="py-2 flex justify-between items-center gap-2">
+                        <span>{guest.name}</span>
+                        <span className="flex gap-2 items-center">
+                          <span className={`px-2 py-1 rounded text-xs ${guest.checkedIn ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{guest.checkedIn ? 'Checked In' : 'Pending'}</span>
+                          <button
+                            className={`px-3 py-1 rounded text-xs ${guest.checkedIn ? 'bg-red-500 text-white' : 'bg-green-600 text-white'} hover:opacity-90`}
+                            onClick={async () => {
+                              setAdding(true);
+                              setError(null);
+                              try {
+                                await toggleGuestCheckin(eventId, guest._id, !guest.checkedIn);
+                                const data = await fetchEventById(eventId);
+                                setEvent(data.event || null);
+                              } catch (err: any) {
+                                setError(err.message || 'Error updating check-in');
+                              }
+                              setAdding(false);
+                            }}
+                            disabled={adding}
+                          >{guest.checkedIn ? 'Undo' : 'Check In'}</button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex justify-between items-center gap-2 mt-4">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft />
+                      </button>
+                      <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                      <button
+                        className="px-3 py-1 rounded bg-gray-200 text-gray-700 disabled:opacity-50"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight />
+                      </button>
+                    </div>
+                    <label className="block text-sm font-medium ml-2">Show
+                      <select
+                        className="ml-2 border rounded px-2 py-1"
+                        value={guestsPerPage}
+                        onChange={e => {
+                          setGuestsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                        }}
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                      </select>
+                      guests
+                    </label>
+                  </div>
+                </React.Fragment>
+              );
+            })()
           ) : (
             <p className="text-gray-500">No guests yet.</p>
           )}

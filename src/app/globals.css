@@ -199,3 +199,49 @@ body {
 .stat-card {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
+
+/* Print styles: make the hall-canvas use full page and hide UI controls */
+@media print {
+  body {
+    background: white !important;
+    color: #000 !important;
+  }
+  /* Hide navigation and controls */
+  .btn, button, input[type="file"], .guest-item, .drag-item, .btn-link, .card-footer, .card-header {
+    display: none !important;
+  }
+  /* Ensure the hall canvas prints full-bleed within the page margins */
+  .hall-canvas {
+    background-size: 20px 20px;
+    width: 100% !important;
+    height: auto !important;
+    page-break-after: avoid;
+    page-break-before: avoid;
+    page-break-inside: avoid;
+  }
+  /* Improve image rendering for printed export */
+  .hall-canvas, .hall-canvas * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  @page {
+    margin: 12mm;
+  }
+}
+
+/* Toast animations */
+@keyframes toastIn {
+  from { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes toastOut {
+  from { transform: translateY(0) scale(1); opacity: 1; }
+  to { transform: translateY(-6px) scale(0.98); opacity: 0; }
+}
+.toast-entrance {
+  animation: toastIn 220ms cubic-bezier(.2,.9,.2,1) both;
+}
+.toast-exit {
+  animation: toastOut 180ms ease-in both;
+}
