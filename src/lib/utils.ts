@@ -138,6 +138,18 @@ export function getInitials(name: string): string {
     .slice(0, 2)
 }
 
+export function toTitleCase(name: string): string {
+  if (!name) return name
+  return name
+    .split(' ')
+    .map(part => part
+      .split('-')
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+      .join('-')
+    )
+    .join(' ')
+}
+
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 Bytes'
   

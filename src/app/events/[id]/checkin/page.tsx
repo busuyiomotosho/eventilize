@@ -1,5 +1,6 @@
 "use client"
 import React, { useEffect, useRef, useState } from 'react';
+import { toTitleCase } from '@/lib/utils';
 
 type CheckinProps = {
   params?: Promise<{ id: string }>;
@@ -82,7 +83,7 @@ export default function EventCheckInPage({ params }: CheckinProps) {
         )}
         {result && result.checkedIn && (
           <div className="mt-4 text-green-700 font-semibold">
-            Checked in!<br />
+            Checked in, {toTitleCase(guestName)}!<br />
             {result.table ? `Your assigned table: ${result.table}` : 'No table assigned.'}
           </div>
         )}

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Event from '@/lib/models/Event';
+import { toTitleCase } from '@/lib/utils';
 
 function errorResponse(message: string, status: number = 400) {
   return NextResponse.json({ message }, { status });
@@ -74,7 +75,7 @@ export async function PUT(req: NextRequest, context) {
   } else {
     guest.assignedTable = undefined;
   }
-  guest.name = name;
+  guest.name = toTitleCase(name);
   guest.email = email;
   await event.save();
   return NextResponse.json({ guests: event.guests });

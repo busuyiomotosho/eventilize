@@ -4,6 +4,7 @@ import dbConnect from '@/lib/db';
 import Event from '@/lib/models/Event';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
+import { toTitleCase } from '@/lib/utils';
 
 function errorResponse(message: string, status: number = 400) {
   return NextResponse.json({ message }, { status });
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest, context) {
   const qrCode = crypto.randomBytes(8).toString('hex');
   // Use Mongoose subdocument creation for validation
   const guest = event.guests.create({
-    name,
+    name: toTitleCase(name),
     email,
     checkedIn: false,
     eventId: new mongoose.Types.ObjectId(id),

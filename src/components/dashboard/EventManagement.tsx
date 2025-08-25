@@ -17,6 +17,7 @@ type Table = {
 
 import { fetchEventById, updateEvent, updateEventLayout, addGuest, updateGuest, deleteGuest, toggleGuestCheckin } from '@/lib/api';
 import type { Event, Guest } from '../../lib/types';
+import { toTitleCase } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 // Make sure NOT to import Table from '../../lib/types' or '@/components/events/HallLayoutPlanner' anywhere in this file
 
@@ -113,7 +114,7 @@ function TableModal({ open, table, guests, onRename, onClose, renaming, setRenam
           <ul className="divide-y">
             {table.assignedGuests.map((guestId: string) => {
               const guest = guests.find(g => g._id === guestId);
-              return guest ? (<li key={guest._id || guestId} className="py-2">{guest.name}</li>) : null;
+              return guest ? (<li key={guest._id || guestId} className="py-2">{toTitleCase(guest.name)}</li>) : null;
             })}
           </ul>
         ) : (
@@ -504,7 +505,7 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
                       const guestId = guest._id || (guest as any).id;
                       return (
                         <li key={guestId} className="py-2 flex justify-between items-center gap-2">
-                          <span>{guest.name}</span>
+                          <span>{toTitleCase(guest.name)}</span>
                           <span className="flex gap-2 items-center">
                             <button
                               className={`px-2 py-1 rounded text-xs ${guest.checkedIn ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}
@@ -697,7 +698,7 @@ export default function EventManagement({ eventId, onBack }: { eventId: string, 
                   <ul className="divide-y">
                     {paginatedGuests.map((guest: Guest) => (
                       <li key={guest._id || guest.email || guest.name} className="py-2 flex justify-between items-center gap-2">
-                        <span>{guest.name}</span>
+                        <span>{toTitleCase(guest.name)}</span>
                         <span className="flex gap-2 items-center">
                           <span className={`px-2 py-1 rounded text-xs ${guest.checkedIn ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{guest.checkedIn ? 'Checked In' : 'Pending'}</span>
                           <button

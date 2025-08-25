@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import { toTitleCase } from '@/lib/utils';
 import Papa from 'papaparse';
 import domtoimage from 'dom-to-image-more';
 import type { Table, Guest } from '@/lib/types';
@@ -542,7 +543,7 @@ export default function HallLayoutPlanner({ eventId, tables, guests = [], readOn
                     <summary className="cursor-pointer">Preview matched rows</summary>
                     <div className="mt-2 text-sm">
                       {importPreview[0].matched.map((m: any, idx: number) => (
-                        <div key={idx} className="py-1 border-b">{m.guest.name} ({m.guest.email || 'no email'}) → {m.table.name}</div>
+                        <div key={idx} className="py-1 border-b">{toTitleCase(m.guest.name)} ({m.guest.email || 'no email'}) → {m.table.name}</div>
                       ))}
                     </div>
                   </details>
@@ -550,7 +551,7 @@ export default function HallLayoutPlanner({ eventId, tables, guests = [], readOn
                     <summary className="cursor-pointer">Preview unmatched rows</summary>
                     <div className="mt-2 text-sm">
                       {importPreview[0].unmatched.map((u: any, idx: number) => (
-                        <div key={idx} className="py-1 border-b">{u.guestName || u.guestEmail} — {u.tableName || u.tableId} <span className="text-xs text-gray-500">({u.reason})</span></div>
+                        <div key={idx} className="py-1 border-b">{toTitleCase(u.guestName || u.guestEmail)} — {u.tableName || u.tableId} <span className="text-xs text-gray-500">({u.reason})</span></div>
                       ))}
                     </div>
                   </details>
@@ -570,7 +571,7 @@ export default function HallLayoutPlanner({ eventId, tables, guests = [], readOn
             onDragStart={() => setDraggedGuestId(guest._id)}
             onDragEnd={() => setDraggedGuestId(null)}
           >
-            {guest.name}
+            {toTitleCase(guest.name)}
           </div>
         ))}
       </div>
